@@ -434,6 +434,53 @@ function DataManager.GetBackpack()
     return backpack
 end
 
+-- New function to get fruits/food items
+function DataManager.GetFruits()
+    local data = DataManager.GetPlayerData()
+    local inventoryData = data.InventoryData or {}
+    local fruits = {}
+    
+    print("🔍 Searching for fruits in InventoryData...")
+    
+    -- Convert InventoryData to simple name->quantity format
+    for uuid, itemInfo in pairs(inventoryData) do
+        if typeof(itemInfo) == "table" then
+            local itemType = itemInfo.ItemType
+            local itemData = itemInfo.ItemData
+            
+            print("  Item type:", itemType, "Name:", itemData and itemData.ItemName)
+            
+            -- Look for food/fruit items (not seeds)
+            if itemType and itemType ~= "Seed" and itemData and itemData.ItemName and itemData.Quantity then
+                local itemName = itemData.ItemName
+                local quantity = itemData.Quantity or 0
+                
+                -- Check if it's likely a fruit/food item
+                if itemType == "Holdable" or itemType == "Food" or itemType == "Fruit" or
+                   itemName:find("Apple") or itemName:find("Banana") or itemName:find("Berry") or 
+                   itemName:find("Carrot") or itemName:find("Tomato") or itemName:find("Cherry") or
+                   itemName:find("Bamboo") or itemName:find("Watermelon") or itemName:find("Dragon") then
+                    
+                    fruits[itemName] = (fruits[itemName] or 0) + quantity
+                    print("  ✅ Found fruit:", itemName, "x" .. quantity, "(Type:", itemType, ")")
+                end
+            end
+        end
+    end
+    
+    -- Also check legacy Backpack for fruits
+    local legacyBackpack = data.Backpack or {}
+    for itemName, quantity in pairs(legacyBackpack) do
+        if not itemName:find("Seed") then -- Not seeds
+            fruits[itemName] = (fruits[itemName] or 0) + quantity
+            print("  ✅ Found legacy fruit:", itemName, "x" .. quantity)
+        end
+    end
+    
+    print("🍎 Total fruits found:", next(fruits) and "Some" or "None")
+    return fruits
+end
+
 function DataManager.GetSheckles()
     local data = DataManager.GetPlayerData()
     return data.Sheckles or 0
@@ -1231,7 +1278,8 @@ function PetManager.FeedPets()
     
     local petData = DataManager.GetPetData()
     local inventory = petData.PetInventory and petData.PetInventory.Data or {}
-    local backpack = DataManager.GetBackpack()
+    local seedsBackpack = DataManager.GetBackpack() -- Seeds only
+    local fruitsBackpack = DataManager.GetFruits() -- Fruits only
     local selectedFruits = AutomationConfig.PetManagement.SelectedFruits or {}
     local feedThreshold = tonumber(AutomationConfig.PetManagement.FeedThreshold) or 500
     
@@ -1240,8 +1288,16 @@ function PetManager.FeedPets()
     for key, value in pairs(selectedFruits) do
         print("  [" .. tostring(key) .. "] = " .. tostring(value))
     end
-    print("🎒 Available in backpack:")
-    for item, amount in pairs(backpack) do
+    
+    print("🌱 Available seeds in backpack:")
+    for item, amount in pairs(seedsBackpack) do
+        if amount > 0 then
+            print("  -", item, "x" .. amount)
+        end
+    end
+    
+    print("🍎 Available fruits in inventory:")
+    for item, amount in pairs(fruitsBackpack) do
         if amount > 0 then
             print("  -", item, "x" .. amount)
         end
@@ -1260,10 +1316,10 @@ function PetManager.FeedPets()
         
         print("  Looking for grown fruit:", fruitName)
         
-        -- Look for the grown fruit in backpack (without "Seed")
-        if backpack[fruitName] and backpack[fruitName] > 0 then
+        -- Look for the grown fruit in fruits inventory (without "Seed")
+        if fruitsBackpack[fruitName] and fruitsBackpack[fruitName] > 0 then
             availableFruit = fruitName
-            print("✅ Found grown fruit:", availableFruit, "(amount:", backpack[fruitName], ")")
+            print("✅ Found grown fruit:", availableFruit, "(amount:", fruitsBackpack[fruitName], ")")
             break
         else
             print("❌ Grown fruit not found:", fruitName)
