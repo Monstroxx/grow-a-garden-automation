@@ -456,10 +456,11 @@ function DataManager.GetFruits()
                 local quantity = itemData.Quantity or 0
                 
                 -- Check if it's likely a fruit/food item
-                if itemType == "Holdable" or itemType == "Food" or itemType == "Fruit" or
-                   itemName:find("Apple") or itemName:find("Banana") or itemName:find("Berry") or 
-                   itemName:find("Carrot") or itemName:find("Tomato") or itemName:find("Cherry") or
-                   itemName:find("Bamboo") or itemName:find("Watermelon") or itemName:find("Dragon") then
+                if itemType == "Holdable" and (
+                   itemName == "Apple" or itemName == "Banana" or itemName == "Carrot" or 
+                   itemName == "Tomato" or itemName == "Cherry" or itemName == "Bamboo" or 
+                   itemName == "Watermelon" or itemName == "Blueberry" or itemName == "Strawberry" or
+                   itemName:find("Berry") or itemName:find("Fruit") or itemName:find("Dragon")) then
                     
                     fruits[itemName] = (fruits[itemName] or 0) + quantity
                     print("  ✅ Found fruit:", itemName, "x" .. quantity, "(Type:", itemType, ")")
