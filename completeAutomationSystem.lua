@@ -455,15 +455,25 @@ function DataManager.GetFruits()
                 local itemName = itemData.ItemName
                 local quantity = itemData.Quantity or 0
                 
-                -- Check if it's likely a fruit/food item
-                if itemType == "Holdable" and (
-                   itemName == "Apple" or itemName == "Banana" or itemName == "Carrot" or 
-                   itemName == "Tomato" or itemName == "Cherry" or itemName == "Bamboo" or 
-                   itemName == "Watermelon" or itemName == "Blueberry" or itemName == "Strawberry" or
-                   itemName:find("Berry") or itemName:find("Fruit") or itemName:find("Dragon")) then
+                print("    Checking item:", itemName, "Type:", itemType, "Quantity:", quantity)
+                
+                -- Check if it's a Holdable fruit
+                if itemType == "Holdable" then
+                    print("      This is Holdable, checking if it's a fruit...")
                     
-                    fruits[itemName] = (fruits[itemName] or 0) + quantity
-                    print("  ✅ Found fruit:", itemName, "x" .. quantity, "(Type:", itemType, ")")
+                    local isFruit = (
+                       itemName == "Apple" or itemName == "Banana" or itemName == "Carrot" or 
+                       itemName == "Tomato" or itemName == "Cherry" or itemName == "Bamboo" or 
+                       itemName == "Watermelon" or itemName == "Blueberry" or itemName == "Strawberry" or
+                       itemName:find("Berry") or itemName:find("Fruit") or itemName:find("Dragon")
+                    )
+                    
+                    print("      Is fruit?", isFruit, "(itemName='" .. tostring(itemName) .. "')")
+                    
+                    if isFruit and quantity > 0 then
+                        fruits[itemName] = (fruits[itemName] or 0) + quantity
+                        print("      ✅ Added fruit:", itemName, "x" .. quantity)
+                    end
                 end
             end
         end
