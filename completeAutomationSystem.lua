@@ -2475,29 +2475,47 @@ end
 local function GetAvailableFruits()
     local fruits = {}
     
-    -- Extract ALL fruits from GrowableData (not just common)
+    -- Debug: Check GrowableData type
     if GrowableData then
-        for itemName, data in pairs(GrowableData) do
-            -- Check if this plant produces fruit or is edible
-            if data.FruitData or itemName:find("Apple") or itemName:find("Banana") or itemName:find("Berry") or itemName:find("Carrot") or itemName:find("Tomato") or itemName:find("Cherry") then
-                -- Get rarity from plant data if available
-                local rarity = "Common" -- Default
-                if data.PlantData and data.PlantData.Rarity then
-                    rarity = data.PlantData.Rarity
-                elseif data.FruitData and data.FruitData.Rarity then
-                    rarity = data.FruitData.Rarity
-                elseif data.Rarity then
-                    rarity = data.Rarity
+        print("GrowableData type:", type(GrowableData))
+    else
+        print("GrowableData is nil")
+    end
+    
+    -- Try to extract fruits from GrowableData if available
+    local success, result = pcall(function()
+        if GrowableData and type(GrowableData) == "table" then
+            for itemName, data in pairs(GrowableData) do
+                if type(data) == "table" then
+                    -- Check if this plant produces fruit or is edible
+                    if (data.FruitData and type(data.FruitData) == "table") or 
+                       itemName:find("Apple") or itemName:find("Banana") or itemName:find("Berry") or 
+                       itemName:find("Carrot") or itemName:find("Tomato") or itemName:find("Cherry") then
+                        
+                        -- Get rarity from plant data if available
+                        local rarity = "Common" -- Default
+                        if data.PlantData and type(data.PlantData) == "table" and data.PlantData.Rarity then
+                            rarity = data.PlantData.Rarity
+                        elseif data.FruitData and type(data.FruitData) == "table" and data.FruitData.Rarity then
+                            rarity = data.FruitData.Rarity
+                        elseif data.Rarity then
+                            rarity = data.Rarity
+                        end
+                        
+                        table.insert(fruits, {
+                            name = itemName,
+                            rarity = rarity,
+                            price = 0, -- Fruits are grown, not bought
+                            id = itemName
+                        })
+                    end
                 end
-                
-                table.insert(fruits, {
-                    name = itemName,
-                    rarity = rarity,
-                    price = 0, -- Fruits are grown, not bought
-                    id = itemName
-                })
             end
         end
+    end)
+    
+    if not success then
+        print("Warning: Could not access GrowableData:", result)
     end
     
     -- Add some additional fruits with proper rarities
