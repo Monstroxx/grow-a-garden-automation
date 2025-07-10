@@ -100,10 +100,10 @@ local AutomationConfig = {
         Enabled = false,
         AutoFeed = true,
         FeedThreshold = 500,
-        FeedFruit = "Apple",
+        SelectedFruits = {},
         AutoHatchEggs = true,
         AutoPlaceEggs = true,
-        EggType = "Common Egg",
+        SelectedEggs = {},
         PlaceEggInterval = 10,
     },
     
@@ -1163,18 +1163,48 @@ function PetManager.NavigateToPetInventory()
     return success
 end
 
--- Get Active Pet Service and PetEgg Service
-local ActivePetService = ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("ActivePetService")
-local PetEggService = ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("PetEggService")
+-- Safe remote access functions
+local function GetActivePetService()
+    local success, service = pcall(function()
+        return ReplicatedStorage:WaitForChild("GameEvents", 5):WaitForChild("ActivePetService", 5)
+    end)
+    return success and service or nil
+end
+
+local function GetPetEggService()
+    local success, service = pcall(function()
+        return ReplicatedStorage:WaitForChild("GameEvents", 5):WaitForChild("PetEggService", 5)
+    end)
+    return success and service or nil
+end
 
 function PetManager.PlaceEgg()
     if not AutomationConfig.PetManagement.AutoPlaceEggs then return end
+    
+    local selectedEggs = AutomationConfig.PetManagement.SelectedEggs or {}
+    
+    -- Check if any eggs are selected
+    local eggToPlace = nil
+    for eggName, _ in pairs(selectedEggs) do
+        eggToPlace = eggName
+        break -- Use first selected egg
+    end
+    
+    if not eggToPlace then
+        return
+    end
     
     local player = LocalPlayer
     local character = player.Character
     if not character or not character.PrimaryPart then return end
     
     local position = character.PrimaryPart.Position + Vector3.new(math.random(-10, 10), 0, math.random(-10, 10))
+    
+    local PetEggService = GetPetEggService()
+    if not PetEggService then
+        webhook:Log("ERROR", "PetEggService not available")
+        return
+    end
     
     local success, error = pcall(function()
         -- Use PetEggService CreateEgg remote
@@ -1183,7 +1213,7 @@ function PetManager.PlaceEgg()
     
     if success then
         webhook:Log("INFO", "Placed egg", {
-            EggType = AutomationConfig.PetManagement.EggType,
+            EggType = eggToPlace,
             Position = tostring(position)
         })
     else
@@ -1198,10 +1228,18 @@ function PetManager.FeedPets()
     local petData = DataManager.GetPetData()
     local inventory = petData.PetInventory and petData.PetInventory.Data or {}
     local backpack = DataManager.GetBackpack()
-    local feedFruit = AutomationConfig.PetManagement.FeedFruit
+    local selectedFruits = AutomationConfig.PetManagement.SelectedFruits or {}
     
-    -- Check if selected fruit is available
-    if not backpack[feedFruit] or backpack[feedFruit] <= 0 then
+    -- Check if any selected fruits are available
+    local availableFruit = nil
+    for fruitName, _ in pairs(selectedFruits) do
+        if backpack[fruitName] and backpack[fruitName] > 0 then
+            availableFruit = fruitName
+            break
+        end
+    end
+    
+    if not availableFruit then
         return
     end
     
@@ -1213,7 +1251,7 @@ function PetManager.FeedPets()
     -- Find fruit tool in backpack
     local fruitTool = nil
     for _, item in pairs(LocalPlayer.Backpack:GetChildren()) do
-        if item:IsA("Tool") and item.Name == feedFruit then
+        if item:IsA("Tool") and item.Name == availableFruit then
             fruitTool = item
             break
         end
@@ -1228,6 +1266,12 @@ function PetManager.FeedPets()
     -- Feed pets using ActivePetService
     for petId, pet in pairs(inventory) do
         if pet.Hunger and pet.Hunger < AutomationConfig.PetManagement.FeedThreshold then
+            local ActivePetService = GetActivePetService()
+            if not ActivePetService then
+                webhook:Log("ERROR", "ActivePetService not available")
+                return
+            end
+            
             local success, error = pcall(function()
                 -- Use ActivePetService Feed remote with pet UUID
                 ActivePetService:FireServer("Feed", petId)
@@ -1236,7 +1280,7 @@ function PetManager.FeedPets()
             if success then
                 webhook:Log("INFO", "Fed pet", {
                     PetId = petId,
-                    Food = feedFruit
+                    Food = availableFruit
                 })
                 wait(0.5)
             else
@@ -1265,6 +1309,12 @@ function PetManager.HatchEggs()
         if egg:IsA("Model") and egg:GetAttribute("OWNER") == LocalPlayer.Name then
             local timeToHatch = egg:GetAttribute("TimeToHatch")
             if timeToHatch and timeToHatch <= 0 then
+                local PetEggService = GetPetEggService()
+                if not PetEggService then
+                    webhook:Log("ERROR", "PetEggService not available")
+                    return
+                end
+                
                 local success, error = pcall(function()
                     -- Use PetEggService HatchPet remote
                     PetEggService:FireServer("HatchPet", egg)
@@ -2397,6 +2447,23 @@ local function GetAvailableEggs()
     return eggs
 end
 
+local function GetAvailableFruits()
+    local fruits = {}
+    -- Common fruits for pet feeding
+    local fruitList = {"Apple", "Banana", "Carrot", "Tomato", "Cherry", "Blueberry", "Strawberry", "Mango", "Orange", "Pineapple"}
+    
+    for _, fruitName in pairs(fruitList) do
+        table.insert(fruits, {
+            name = fruitName,
+            rarity = "Common",
+            price = 0, -- Fruits are grown, not bought
+            id = fruitName
+        })
+    end
+    
+    return fruits
+end
+
 -- Function to get real game items data
 local function GetAvailableSeeds()
     local seeds = {}
@@ -2457,7 +2524,8 @@ end
 local GameItems = {
     Seeds = GetAvailableSeeds(),
     Gear = GetAvailableGear(),
-    Eggs = GetAvailableEggs()
+    Eggs = GetAvailableEggs(),
+    Fruits = GetAvailableFruits()
 }
 
 -- Rarity Colors
@@ -3965,8 +4033,13 @@ function CreatePetSection(parent)
     CreateToggle(petContent, "Auto Place Eggs", "Automatically place eggs", AutomationConfig.PetManagement, "AutoPlaceEggs", 4)
     
     CreateTextBox(petContent, "Feed Threshold", "Feed pets below this hunger level", AutomationConfig.PetManagement, "FeedThreshold", 5)
-    CreateTextBox(petContent, "Feed Fruit", "Fruit type for feeding (Apple, Banana, Carrot, Tomato, etc.)", AutomationConfig.PetManagement, "FeedFruit", 6)
-    CreateTextBox(petContent, "Egg Type", "Egg type for placement (Common Egg, Rare Egg, etc.)", AutomationConfig.PetManagement, "EggType", 7)
+    
+    -- Fruit selector for feeding
+    CreateItemSelector(petContent, "Feed Fruits", "Choose which fruits to use for feeding", GameItems.Fruits, AutomationConfig.PetManagement, "SelectedFruits", 6)
+    
+    -- Egg selector for placement
+    CreateItemSelector(petContent, "Place Eggs", "Choose which egg types to place", GameItems.Eggs, AutomationConfig.PetManagement, "SelectedEggs", 7)
+    
     CreateSlider(petContent, "Place Egg Interval", "Seconds between egg placements", AutomationConfig.PetManagement, "PlaceEggInterval", 5, 60, 8)
 end
 
