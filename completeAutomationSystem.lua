@@ -47,6 +47,7 @@ local GearData = SafeRequire(ReplicatedStorage.Data.GearData, "GearData")
 local PetList = SafeRequire(ReplicatedStorage.Data.PetRegistry.PetList, "PetList")
 local PetEggData = SafeRequire(ReplicatedStorage.Data.PetEggData, "PetEggData")
 local SeedPackData = SafeRequire(ReplicatedStorage.Data.SeedPackData, "SeedPackData")
+local GrowableData = SafeRequire(ReplicatedStorage.Data.GrowableData, "GrowableData")
 
 -- Automation Configuration (MUST BE DEFINED FIRST!)
 local AutomationConfig = {
@@ -1229,6 +1230,7 @@ function PetManager.FeedPets()
     local inventory = petData.PetInventory and petData.PetInventory.Data or {}
     local backpack = DataManager.GetBackpack()
     local selectedFruits = AutomationConfig.PetManagement.SelectedFruits or {}
+    local feedThreshold = tonumber(AutomationConfig.PetManagement.FeedThreshold) or 500
     
     -- Check if any selected fruits are available
     local availableFruit = nil
@@ -1243,48 +1245,71 @@ function PetManager.FeedPets()
         return
     end
     
-    -- Equip the fruit first
     local character = LocalPlayer.Character
     local humanoid = character and character:FindFirstChild("Humanoid")
     if not humanoid then return end
     
-    -- Find fruit tool in backpack
+    -- Check if fruit tool is already equipped
     local fruitTool = nil
-    for _, item in pairs(LocalPlayer.Backpack:GetChildren()) do
-        if item:IsA("Tool") and item.Name == availableFruit then
-            fruitTool = item
-            break
+    local equippedTool = character:FindFirstChildOfClass("Tool")
+    if equippedTool and equippedTool.Name == availableFruit then
+        fruitTool = equippedTool
+    else
+        -- Find fruit tool in backpack
+        for _, item in pairs(LocalPlayer.Backpack:GetChildren()) do
+            if item:IsA("Tool") and item.Name == availableFruit then
+                fruitTool = item
+                break
+            end
+        end
+        
+        if fruitTool then
+            -- Equip the fruit (similar to auto plant function)
+            humanoid:EquipTool(fruitTool)
+            wait(0.5)
         end
     end
     
-    if not fruitTool then return end
+    if not fruitTool then
+        return
+    end
     
-    -- Equip the fruit
-    humanoid:EquipTool(fruitTool)
-    wait(0.5)
+    local ActivePetService = GetActivePetService()
+    if not ActivePetService then
+        webhook:Log("ERROR", "ActivePetService not available")
+        return
+    end
     
-    -- Feed pets using ActivePetService
-    for petId, pet in pairs(inventory) do
-        if pet.Hunger and pet.Hunger < AutomationConfig.PetManagement.FeedThreshold then
-            local ActivePetService = GetActivePetService()
-            if not ActivePetService then
-                webhook:Log("ERROR", "ActivePetService not available")
-                return
-            end
-            
+    -- Get only equipped/active pets on the plot
+    local equippedPets = DataManager.GetEquippedPets()
+    if not equippedPets or next(equippedPets) == nil then
+        return -- No pets equipped
+    end
+    
+    -- Feed only equipped pets using ActivePetService with proper UUID format
+    for slot, petId in pairs(equippedPets) do
+        local pet = inventory[petId]
+        if pet and pet.Hunger and pet.Hunger < feedThreshold then
             local success, error = pcall(function()
-                -- Use ActivePetService Feed remote with pet UUID
-                ActivePetService:FireServer("Feed", petId)
+                -- Use ActivePetService Feed remote with pet UUID in curly braces format
+                local formattedPetId = "{" .. petId .. "}"
+                ActivePetService:FireServer("Feed", formattedPetId)
             end)
             
             if success then
-                webhook:Log("INFO", "Fed pet", {
+                webhook:Log("INFO", "Fed equipped pet", {
                     PetId = petId,
-                    Food = availableFruit
+                    Slot = slot,
+                    Food = availableFruit,
+                    Hunger = pet.Hunger
                 })
-                wait(0.5)
+                wait(0.5) -- Small delay between pets
             else
-                webhook:Log("ERROR", "Failed to feed pet", {Error = error})
+                webhook:Log("ERROR", "Failed to feed equipped pet", {
+                    PetId = petId,
+                    Slot = slot,
+                    Error = tostring(error)
+                })
             end
         end
     end
@@ -2313,8 +2338,8 @@ local AutomationSystemAPI = {
         elseif action == "collectPlants" then
             FarmingManager.CollectPlants()
         elseif action == "managePets" then
-            PetManager.OpenPetUI()
-            PetManager.EquipBestPets()
+            PetManager.FeedPets()
+            PetManager.HatchEggs()
         elseif action == "acceptTrade" then
             TradingManager.AcceptIncomingTrade()
         elseif action == "tradeWithPlayer" then
@@ -2449,17 +2474,75 @@ end
 
 local function GetAvailableFruits()
     local fruits = {}
-    -- Common fruits for pet feeding
-    local fruitList = {"Apple", "Banana", "Carrot", "Tomato", "Cherry", "Blueberry", "Strawberry", "Mango", "Orange", "Pineapple"}
     
-    for _, fruitName in pairs(fruitList) do
-        table.insert(fruits, {
-            name = fruitName,
-            rarity = "Common",
-            price = 0, -- Fruits are grown, not bought
-            id = fruitName
-        })
+    -- Extract ALL fruits from GrowableData (not just common)
+    if GrowableData then
+        for itemName, data in pairs(GrowableData) do
+            -- Check if this plant produces fruit or is edible
+            if data.FruitData or itemName:find("Apple") or itemName:find("Banana") or itemName:find("Berry") or itemName:find("Carrot") or itemName:find("Tomato") or itemName:find("Cherry") then
+                -- Get rarity from plant data if available
+                local rarity = "Common" -- Default
+                if data.PlantData and data.PlantData.Rarity then
+                    rarity = data.PlantData.Rarity
+                elseif data.FruitData and data.FruitData.Rarity then
+                    rarity = data.FruitData.Rarity
+                elseif data.Rarity then
+                    rarity = data.Rarity
+                end
+                
+                table.insert(fruits, {
+                    name = itemName,
+                    rarity = rarity,
+                    price = 0, -- Fruits are grown, not bought
+                    id = itemName
+                })
+            end
+        end
     end
+    
+    -- Add some additional fruits with proper rarities
+    local additionalFruits = {
+        {name = "Apple", rarity = "Common"},
+        {name = "Banana", rarity = "Common"},
+        {name = "Carrot", rarity = "Common"},
+        {name = "Tomato", rarity = "Common"},
+        {name = "Cherry", rarity = "Uncommon"},
+        {name = "Blueberry", rarity = "Uncommon"},
+        {name = "Strawberry", rarity = "Uncommon"},
+        {name = "Golden Apple", rarity = "Legendary"},
+        {name = "Diamond Fruit", rarity = "Mythical"},
+    }
+    
+    for _, fruitData in pairs(additionalFruits) do
+        -- Check if not already added
+        local exists = false
+        for _, existingFruit in pairs(fruits) do
+            if existingFruit.name == fruitData.name then
+                exists = true
+                break
+            end
+        end
+        
+        if not exists then
+            table.insert(fruits, {
+                name = fruitData.name,
+                rarity = fruitData.rarity,
+                price = 0,
+                id = fruitData.name
+            })
+        end
+    end
+    
+    -- Sort by rarity first, then alphabetically
+    local rarityOrder = {Common = 1, Uncommon = 2, Rare = 3, Legendary = 4, Mythical = 5, Divine = 6, Prismatic = 7}
+    table.sort(fruits, function(a, b)
+        local rarityA = rarityOrder[a.rarity] or 1
+        local rarityB = rarityOrder[b.rarity] or 1
+        if rarityA == rarityB then
+            return a.name < b.name
+        end
+        return rarityA < rarityB
+    end)
     
     return fruits
 end
