@@ -1236,6 +1236,10 @@ function PetManager.FeedPets()
     local feedThreshold = tonumber(AutomationConfig.PetManagement.FeedThreshold) or 500
     
     print("🍎 Selected fruits:", next(selectedFruits) and "Found" or "None")
+    print("Debug - selectedFruits table:")
+    for key, value in pairs(selectedFruits) do
+        print("  [" .. tostring(key) .. "] = " .. tostring(value))
+    end
     print("🎒 Available in backpack:")
     for item, amount in pairs(backpack) do
         if amount > 0 then
@@ -1243,30 +1247,26 @@ function PetManager.FeedPets()
         end
     end
     
-    -- Check if any selected fruits are available
+    -- Check if any selected fruits are available (selectedFruits is an array, not key-value)
     local availableFruit = nil
-    for fruitName, _ in pairs(selectedFruits) do
-        print("🔍 Checking fruit:", fruitName)
+    
+    -- selectedFruits contains seed names like "Bamboo", "Tomato", "Carrot"
+    -- We need to find the corresponding grown fruit (without "Seed")
+    for _, seedName in pairs(selectedFruits) do
+        print("🔍 Checking selected seed:", seedName)
         
-        -- Try both with and without " Seed" suffix
-        local fruitWithSeed = fruitName .. " Seed"
-        local foundInBackpack = false
-        local actualItemName = nil
+        -- Convert seed name to fruit name (remove " Seed" if present)
+        local fruitName = seedName:gsub(" Seed$", "") -- Remove " Seed" at the end
         
+        print("  Looking for grown fruit:", fruitName)
+        
+        -- Look for the grown fruit in backpack (without "Seed")
         if backpack[fruitName] and backpack[fruitName] > 0 then
-            foundInBackpack = true
-            actualItemName = fruitName
-        elseif backpack[fruitWithSeed] and backpack[fruitWithSeed] > 0 then
-            foundInBackpack = true
-            actualItemName = fruitWithSeed
-        end
-        
-        if foundInBackpack then
-            availableFruit = actualItemName
-            print("✅ Found available fruit:", availableFruit, "(amount:", backpack[actualItemName], ")")
+            availableFruit = fruitName
+            print("✅ Found grown fruit:", availableFruit, "(amount:", backpack[fruitName], ")")
             break
         else
-            print("❌ Fruit not found:", fruitName, "or", fruitWithSeed)
+            print("❌ Grown fruit not found:", fruitName)
         end
     end
     
