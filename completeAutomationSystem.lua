@@ -1224,7 +1224,10 @@ end
 
 
 function PetManager.FeedPets()
-    if not AutomationConfig.PetManagement.AutoFeed then return end
+    if not AutomationConfig.PetManagement.AutoFeed then 
+        print("🐕 Pet feeding disabled")
+        return 
+    end
     
     local petData = DataManager.GetPetData()
     local inventory = petData.PetInventory and petData.PetInventory.Data or {}
@@ -1232,16 +1235,27 @@ function PetManager.FeedPets()
     local selectedFruits = AutomationConfig.PetManagement.SelectedFruits or {}
     local feedThreshold = tonumber(AutomationConfig.PetManagement.FeedThreshold) or 500
     
+    print("🍎 Selected fruits:", next(selectedFruits) and "Found" or "None")
+    print("🎒 Available in backpack:")
+    for item, amount in pairs(backpack) do
+        if amount > 0 then
+            print("  -", item, "x" .. amount)
+        end
+    end
+    
     -- Check if any selected fruits are available
     local availableFruit = nil
     for fruitName, _ in pairs(selectedFruits) do
+        print("🔍 Checking fruit:", fruitName)
         if backpack[fruitName] and backpack[fruitName] > 0 then
             availableFruit = fruitName
+            print("✅ Found available fruit:", availableFruit)
             break
         end
     end
     
     if not availableFruit then
+        print("⚠️ No selected fruits available in backpack")
         return
     end
     
@@ -1282,35 +1296,54 @@ function PetManager.FeedPets()
     
     -- Get only equipped/active pets on the plot
     local equippedPets = DataManager.GetEquippedPets()
+    print("🐕 Equipped pets:", equippedPets and next(equippedPets) and "Found" or "None")
+    
     if not equippedPets or next(equippedPets) == nil then
+        print("⚠️ No pets equipped on plot")
         return -- No pets equipped
     end
+    
+    print("🍷 Equipped fruit:", availableFruit, "ready for feeding")
     
     -- Feed only equipped pets using ActivePetService with proper UUID format
     for slot, petId in pairs(equippedPets) do
         local pet = inventory[petId]
-        if pet and pet.Hunger and pet.Hunger < feedThreshold then
-            local success, error = pcall(function()
-                -- Use ActivePetService Feed remote with pet UUID in curly braces format
-                local formattedPetId = "{" .. petId .. "}"
-                ActivePetService:FireServer("Feed", formattedPetId)
-            end)
-            
-            if success then
-                webhook:Log("INFO", "Fed equipped pet", {
-                    PetId = petId,
-                    Slot = slot,
-                    Food = availableFruit,
-                    Hunger = pet.Hunger
-                })
-                wait(0.5) -- Small delay between pets
+        print("🐶 Checking pet in slot", slot, "ID:", petId)
+        
+        if pet then
+            print("  Pet hunger:", pet.Hunger, "/ threshold:", feedThreshold)
+            if pet.Hunger and pet.Hunger < feedThreshold then
+                print("🍎 Feeding pet", petId, "with", availableFruit)
+                
+                local success, error = pcall(function()
+                    -- Use ActivePetService Feed remote with pet UUID in curly braces format
+                    local formattedPetId = "{" .. petId .. "}"
+                    print("📡 Firing remote: ActivePetService('Feed',", formattedPetId, ")")
+                    ActivePetService:FireServer("Feed", formattedPetId)
+                end)
+                
+                if success then
+                    print("✅ Successfully fed pet", petId)
+                    webhook:Log("INFO", "Fed equipped pet", {
+                        PetId = petId,
+                        Slot = slot,
+                        Food = availableFruit,
+                        Hunger = pet.Hunger
+                    })
+                    wait(0.5) -- Small delay between pets
+                else
+                    print("❌ Failed to feed pet:", error)
+                    webhook:Log("ERROR", "Failed to feed equipped pet", {
+                        PetId = petId,
+                        Slot = slot,
+                        Error = tostring(error)
+                    })
+                end
             else
-                webhook:Log("ERROR", "Failed to feed equipped pet", {
-                    PetId = petId,
-                    Slot = slot,
-                    Error = tostring(error)
-                })
+                print("  Pet not hungry enough")
             end
+        else
+            print("  Pet data not found for ID:", petId)
         end
     end
 end
@@ -2475,78 +2508,15 @@ end
 local function GetAvailableFruits()
     local fruits = {}
     
-    -- Debug: Check GrowableData type
-    if GrowableData then
-        print("GrowableData type:", type(GrowableData))
-    else
-        print("GrowableData is nil")
-    end
-    
-    -- Try to extract fruits from GrowableData if available
-    local success, result = pcall(function()
-        if GrowableData and type(GrowableData) == "table" then
-            for itemName, data in pairs(GrowableData) do
-                if type(data) == "table" then
-                    -- Check if this plant produces fruit or is edible
-                    if (data.FruitData and type(data.FruitData) == "table") or 
-                       itemName:find("Apple") or itemName:find("Banana") or itemName:find("Berry") or 
-                       itemName:find("Carrot") or itemName:find("Tomato") or itemName:find("Cherry") then
-                        
-                        -- Get rarity from plant data if available
-                        local rarity = "Common" -- Default
-                        if data.PlantData and type(data.PlantData) == "table" and data.PlantData.Rarity then
-                            rarity = data.PlantData.Rarity
-                        elseif data.FruitData and type(data.FruitData) == "table" and data.FruitData.Rarity then
-                            rarity = data.FruitData.Rarity
-                        elseif data.Rarity then
-                            rarity = data.Rarity
-                        end
-                        
-                        table.insert(fruits, {
-                            name = itemName,
-                            rarity = rarity,
-                            price = 0, -- Fruits are grown, not bought
-                            id = itemName
-                        })
-                    end
-                end
-            end
-        end
-    end)
-    
-    if not success then
-        print("Warning: Could not access GrowableData:", result)
-    end
-    
-    -- Add some additional fruits with proper rarities
-    local additionalFruits = {
-        {name = "Apple", rarity = "Common"},
-        {name = "Banana", rarity = "Common"},
-        {name = "Carrot", rarity = "Common"},
-        {name = "Tomato", rarity = "Common"},
-        {name = "Cherry", rarity = "Uncommon"},
-        {name = "Blueberry", rarity = "Uncommon"},
-        {name = "Strawberry", rarity = "Uncommon"},
-        {name = "Golden Apple", rarity = "Legendary"},
-        {name = "Diamond Fruit", rarity = "Mythical"},
-    }
-    
-    for _, fruitData in pairs(additionalFruits) do
-        -- Check if not already added
-        local exists = false
-        for _, existingFruit in pairs(fruits) do
-            if existingFruit.name == fruitData.name then
-                exists = true
-                break
-            end
-        end
-        
-        if not exists then
+    -- Extract fruits from SeedData (seeds = fruits in this game)
+    if SeedData then
+        for seedName, seedData in pairs(SeedData) do
+            -- Seeds grow into fruits, so all seeds are potential fruits for feeding
             table.insert(fruits, {
-                name = fruitData.name,
-                rarity = fruitData.rarity,
-                price = 0,
-                id = fruitData.name
+                name = seedName,
+                rarity = seedData.SeedRarity or "Common",
+                price = seedData.Price or 0,
+                id = seedData.PurchaseID or seedName
             })
         end
     end
@@ -2562,6 +2532,7 @@ local function GetAvailableFruits()
         return rarityA < rarityB
     end)
     
+    print("🍎 Loaded", #fruits, "fruits from SeedData")
     return fruits
 end
 
