@@ -1247,10 +1247,26 @@ function PetManager.FeedPets()
     local availableFruit = nil
     for fruitName, _ in pairs(selectedFruits) do
         print("🔍 Checking fruit:", fruitName)
+        
+        -- Try both with and without " Seed" suffix
+        local fruitWithSeed = fruitName .. " Seed"
+        local foundInBackpack = false
+        local actualItemName = nil
+        
         if backpack[fruitName] and backpack[fruitName] > 0 then
-            availableFruit = fruitName
-            print("✅ Found available fruit:", availableFruit)
+            foundInBackpack = true
+            actualItemName = fruitName
+        elseif backpack[fruitWithSeed] and backpack[fruitWithSeed] > 0 then
+            foundInBackpack = true
+            actualItemName = fruitWithSeed
+        end
+        
+        if foundInBackpack then
+            availableFruit = actualItemName
+            print("✅ Found available fruit:", availableFruit, "(amount:", backpack[actualItemName], ")")
             break
+        else
+            print("❌ Fruit not found:", fruitName, "or", fruitWithSeed)
         end
     end
     
@@ -1268,19 +1284,31 @@ function PetManager.FeedPets()
     local equippedTool = character:FindFirstChildOfClass("Tool")
     if equippedTool and equippedTool.Name == availableFruit then
         fruitTool = equippedTool
+        print("🛠️ Fruit already equipped:", availableFruit)
     else
         -- Find fruit tool in backpack
+        print("🔍 Searching for tool in backpack:", availableFruit)
         for _, item in pairs(LocalPlayer.Backpack:GetChildren()) do
             if item:IsA("Tool") and item.Name == availableFruit then
                 fruitTool = item
+                print("✅ Found fruit tool:", item.Name)
                 break
             end
         end
         
         if fruitTool then
             -- Equip the fruit (similar to auto plant function)
+            print("🛠️ Equipping fruit:", fruitTool.Name)
             humanoid:EquipTool(fruitTool)
             wait(0.5)
+        else
+            print("❌ Fruit tool not found in backpack:", availableFruit)
+            print("Available tools:")
+            for _, item in pairs(LocalPlayer.Backpack:GetChildren()) do
+                if item:IsA("Tool") then
+                    print("  -", item.Name)
+                end
+            end
         end
     end
     
