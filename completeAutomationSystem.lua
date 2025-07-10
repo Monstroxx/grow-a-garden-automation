@@ -98,18 +98,13 @@ local AutomationConfig = {
     -- Pet Management
     PetManagement = {
         Enabled = false,
-        AutoEquip = true,
-        AutoUnequip = true,
         AutoFeed = true,
         FeedThreshold = 500,
+        FeedFruit = "Apple",
         AutoHatchEggs = true,
-        HatchInterval = 10,
-        PreferredPets = {},
-        AutoUnequipWeak = true,
-        FeedAllPets = true,
-        EquipBestPets = true,
-        AutoLevelPets = true,
-        PetEquipSlots = 3,
+        AutoPlaceEggs = true,
+        EggType = "Common Egg",
+        PlaceEggInterval = 10,
     },
     
     -- Events & Quests
@@ -1168,134 +1163,84 @@ function PetManager.NavigateToPetInventory()
     return success
 end
 
-function PetManager.EquipBestPets()
-    if not AutomationConfig or not AutomationConfig.PetManagement or not AutomationConfig.PetManagement.AutoEquip or not AutomationConfig.PetManagement.EquipBestPets then
-        return
-    end
+-- Get Active Pet Service and PetEgg Service
+local ActivePetService = ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("ActivePetService")
+local PetEggService = ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("PetEggService")
+
+function PetManager.PlaceEgg()
+    if not AutomationConfig.PetManagement.AutoPlaceEggs then return end
     
-    local petData = DataManager.GetPetData()
-    local inventory = petData.PetInventory and petData.PetInventory.Data or {}
-    local equipped = DataManager.GetEquippedPets()
+    local player = LocalPlayer
+    local character = player.Character
+    if not character or not character.PrimaryPart then return end
     
-    -- Find best pets to equip
-    local bestPets = {}
-    for petId, pet in pairs(inventory) do
-        if pet and PetList[pet.PetType] then
-            local rarity = PetList[pet.PetType].Rarity or "Common"
-            local level = pet.Level or 1
-            local value = (level * 100) + (RarityValues[rarity] or 0)
-            
-            table.insert(bestPets, {
-                id = petId,
-                data = pet,
-                rarity = rarity,
-                level = level,
-                value = value
-            })
-        end
-    end
+    local position = character.PrimaryPart.Position + Vector3.new(math.random(-10, 10), 0, math.random(-10, 10))
     
-    -- Sort by value (level + rarity)
-    table.sort(bestPets, function(a, b)
-        return a.value > b.value
+    local success, error = pcall(function()
+        -- Use PetEggService CreateEgg remote
+        PetEggService:FireServer("CreateEgg", position)
     end)
     
-    -- Equip best pets up to slot limit
-    local maxSlots = (AutomationConfig.PetManagement and AutomationConfig.PetManagement.PetEquipSlots) or 3
-    for i = 1, math.min(#bestPets, maxSlots) do
-        local pet = bestPets[i]
-        if not equipped[tostring(i)] or equipped[tostring(i)] ~= pet.id then
-            local success, error = pcall(function()
-                PetsService:EquipPet(pet.id, i)
-            end)
-            
-            if success then
-                webhook:Log("INFO", "Equipped pet", {
-                    PetType = pet.data.PetType,
-                    Slot = i,
-                    Level = pet.level
-                })
-                wait(0.5)
-            else
-                webhook:Log("ERROR", "Failed to equip pet", {Error = error})
-            end
-        end
+    if success then
+        webhook:Log("INFO", "Placed egg", {
+            EggType = AutomationConfig.PetManagement.EggType,
+            Position = tostring(position)
+        })
+    else
+        webhook:Log("ERROR", "Failed to place egg", {Error = error})
     end
 end
 
-function PetManager.UnequipWeakPets()
-    if not AutomationConfig or not AutomationConfig.PetManagement or not AutomationConfig.PetManagement.AutoUnequip or not AutomationConfig.PetManagement.AutoUnequipWeak then
-        return
-    end
-    
-    local equipped = DataManager.GetEquippedPets()
-    local petData = DataManager.GetPetData()
-    local inventory = petData.PetInventory and petData.PetInventory.Data or {}
-    
-    for slot, petId in pairs(equipped) do
-        local pet = inventory[petId]
-        if pet and pet.Level and pet.Level < 5 then -- Unequip pets below level 5
-            local success, error = pcall(function()
-                PetsService:UnequipPet(petId)
-            end)
-            
-            if success then
-                webhook:Log("INFO", "Unequipped weak pet", {
-                    PetType = pet.PetType,
-                    Level = pet.Level
-                })
-                wait(0.5)
-            else
-                webhook:Log("ERROR", "Failed to unequip pet", {Error = error})
-            end
-        end
-    end
-end
 
 function PetManager.FeedPets()
-    if not AutomationConfig or not AutomationConfig.PetManagement or not AutomationConfig.PetManagement.AutoFeed then return end
+    if not AutomationConfig.PetManagement.AutoFeed then return end
     
     local petData = DataManager.GetPetData()
     local inventory = petData.PetInventory and petData.PetInventory.Data or {}
     local backpack = DataManager.GetBackpack()
+    local feedFruit = AutomationConfig.PetManagement.FeedFruit
     
-    -- Get pets to feed
-    local petsToFeed = {}
-    if AutomationConfig.PetManagement.FeedAllPets then
-        petsToFeed = inventory
-    else
-        local equipped = DataManager.GetEquippedPets()
-        for _, petId in pairs(equipped) do
-            if inventory[petId] then
-                petsToFeed[petId] = inventory[petId]
-            end
+    -- Check if selected fruit is available
+    if not backpack[feedFruit] or backpack[feedFruit] <= 0 then
+        return
+    end
+    
+    -- Equip the fruit first
+    local character = LocalPlayer.Character
+    local humanoid = character and character:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    -- Find fruit tool in backpack
+    local fruitTool = nil
+    for _, item in pairs(LocalPlayer.Backpack:GetChildren()) do
+        if item:IsA("Tool") and item.Name == feedFruit then
+            fruitTool = item
+            break
         end
     end
     
-    for petId, pet in pairs(petsToFeed) do
+    if not fruitTool then return end
+    
+    -- Equip the fruit
+    humanoid:EquipTool(fruitTool)
+    wait(0.5)
+    
+    -- Feed pets using ActivePetService
+    for petId, pet in pairs(inventory) do
         if pet.Hunger and pet.Hunger < AutomationConfig.PetManagement.FeedThreshold then
-            -- Find suitable food in inventory
-            for itemName, amount in pairs(backpack) do
-                if amount > 0 and PetManager.IsPetFood(itemName) then
-                    local success, error = pcall(function()
-                        -- Pet feeding logic would go here
-                        -- This depends on the game's pet feeding system
-                        local PetFeedingService = ReplicatedStorage:FindFirstChild("PetFeedingService")
-                        if PetFeedingService then
-                            PetFeedingService:FireServer("FeedPet", petId, itemName)
-                        end
-                    end)
-                    
-                    if success then
-                        webhook:Log("INFO", "Fed pet", {
-                            PetId = petId,
-                            Food = itemName
-                        })
-                        break
-                    else
-                        webhook:Log("ERROR", "Failed to feed pet", {Error = error})
-                    end
-                end
+            local success, error = pcall(function()
+                -- Use ActivePetService Feed remote with pet UUID
+                ActivePetService:FireServer("Feed", petId)
+            end)
+            
+            if success then
+                webhook:Log("INFO", "Fed pet", {
+                    PetId = petId,
+                    Food = feedFruit
+                })
+                wait(0.5)
+            else
+                webhook:Log("ERROR", "Failed to feed pet", {Error = error})
             end
         end
     end
@@ -1313,25 +1258,26 @@ function PetManager.IsPetFood(itemName)
 end
 
 function PetManager.HatchEggs()
-    if not AutomationConfig or not AutomationConfig.PetManagement or not AutomationConfig.PetManagement.AutoHatchEggs then return end
+    if not AutomationConfig.PetManagement.AutoHatchEggs then return end
     
-    local backpack = DataManager.GetBackpack()
-    
-    for eggName, amount in pairs(backpack) do
-        if amount > 0 and eggName:find("Egg") then
-            local success, error = pcall(function()
-                -- Egg hatching logic
-                local EggHatchingService = ReplicatedStorage:FindFirstChild("EggHatchingService")
-                if EggHatchingService then
-                    EggHatchingService:FireServer("HatchEgg", eggName)
+    -- Find eggs in world that are ready to hatch
+    for _, egg in pairs(workspace:GetChildren()) do
+        if egg:IsA("Model") and egg:GetAttribute("OWNER") == LocalPlayer.Name then
+            local timeToHatch = egg:GetAttribute("TimeToHatch")
+            if timeToHatch and timeToHatch <= 0 then
+                local success, error = pcall(function()
+                    -- Use PetEggService HatchPet remote
+                    PetEggService:FireServer("HatchPet", egg)
+                end)
+                
+                if success then
+                    webhook:Log("INFO", "Hatched egg", {
+                        EggName = egg:GetAttribute("EggName") or "Unknown"
+                    })
+                    wait(1)
+                else
+                    webhook:Log("ERROR", "Failed to hatch egg", {Error = error})
                 end
-            end)
-            
-            if success then
-                webhook:Log("INFO", "Hatched egg", {EggType = eggName})
-                wait(AutomationConfig.PetManagement.HatchInterval)
-            else
-                webhook:Log("ERROR", "Failed to hatch egg", {Error = error})
             end
         end
     end
@@ -2101,6 +2047,7 @@ local lastTasks = {
     openPacks = 0,
     handleTrades = 0,
     useWateringCan = 0,
+    placeEggs = 0,
 }
 
 local function MainLoop()
@@ -2158,11 +2105,15 @@ local function MainLoop()
             
             -- Pet Management
             if AutomationConfig.PetManagement and AutomationConfig.PetManagement.Enabled and currentTime - lastTasks.managePets >= 10 then
-                pcall(PetManager.EquipBestPets)
-                pcall(PetManager.UnequipWeakPets)
                 pcall(PetManager.FeedPets)
                 pcall(PetManager.HatchEggs)
                 lastTasks.managePets = currentTime
+            end
+            
+            -- Egg Placement (separate interval)
+            if AutomationConfig.PetManagement and AutomationConfig.PetManagement.Enabled and AutomationConfig.PetManagement.AutoPlaceEggs and currentTime - lastTasks.placeEggs >= AutomationConfig.PetManagement.PlaceEggInterval then
+                pcall(PetManager.PlaceEgg)
+                lastTasks.placeEggs = currentTime
             end
             
             -- Events (every 60 seconds)
