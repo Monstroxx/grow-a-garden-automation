@@ -4014,8 +4014,8 @@ function CreatePetSection(parent)
     CreateToggle(petContent, "Auto Place Eggs", "Automatically place eggs", AutomationConfig.PetManagement, "AutoPlaceEggs", 4)
     
     CreateTextBox(petContent, "Feed Threshold", "Feed pets below this hunger level", AutomationConfig.PetManagement, "FeedThreshold", 5)
-    CreateDropdown(petContent, "Feed Fruit", "Select fruit type for feeding", AutomationConfig.PetManagement, "FeedFruit", GetAvailableFruits(), 6)
-    CreateDropdown(petContent, "Egg Type", "Select egg type for placement", AutomationConfig.PetManagement, "EggType", GetAvailableEggTypes(), 7)
+    CreateTextBox(petContent, "Feed Fruit", "Fruit type for feeding (Apple, Banana, Carrot, Tomato, etc.)", AutomationConfig.PetManagement, "FeedFruit", 6)
+    CreateTextBox(petContent, "Egg Type", "Egg type for placement (Common Egg, Rare Egg, etc.)", AutomationConfig.PetManagement, "EggType", 7)
     CreateSlider(petContent, "Place Egg Interval", "Seconds between egg placements", AutomationConfig.PetManagement, "PlaceEggInterval", 5, 60, 8)
 end
 
