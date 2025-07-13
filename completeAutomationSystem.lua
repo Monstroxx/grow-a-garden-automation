@@ -1413,6 +1413,8 @@ function PetManager.FeedPets()
                 
                 -- Check for holdable fruits (ITEM_TYPE = "j")
                 -- Tool names include weight and mutations, so check if they contain the fruit name
+                print("    Checking:", tool.Name, "itemType:", itemType, "contains", availableFruit, "?", tool.Name:find(availableFruit) ~= nil)
+                
                 if itemType == "j" and tool.Name:find(availableFruit) then
                     fruitTool = tool
                     print("✅ Found fruit tool in backpack:", tool.Name)
