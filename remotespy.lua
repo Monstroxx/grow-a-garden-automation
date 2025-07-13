@@ -36,6 +36,4 @@ local args = {
 game:GetService("ReplicatedStorage"):WaitForChild("GameEvents"):WaitForChild("PetEggService"):FireServer(unpack(args))
 
 
---remove auto equip best
---remove pet equip slot dragbar
---make feed threshold to input field
+

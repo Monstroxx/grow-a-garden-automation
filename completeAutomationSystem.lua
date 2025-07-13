@@ -1524,7 +1524,7 @@ function PetManager.FeedPets()
                             local actionText = obj.ActionText or ""
                             
                             -- Check if this is a Feed prompt (starts with "Feed%")
-                            if actionText:find("^Feed%%") and parent then
+                            if actionText:find("Feed") and parent then
                                 -- Check if this pet belongs to us by UUID attribute
                                 local petUUID = parent:GetAttribute("PET_UUID")
                                 
