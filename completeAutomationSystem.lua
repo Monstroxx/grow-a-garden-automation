@@ -1234,6 +1234,13 @@ local function GetInventoryService()
     local success, service = pcall(function()
         return ReplicatedStorage:WaitForChild("Modules", 5):WaitForChild("InventoryService", 5)
     end)
+    
+    if success then
+        print("🔧 GetInventoryService: Found service")
+    else
+        print("🔧 GetInventoryService: Failed to find service")
+    end
+    
     return success and service or nil
 end
 
@@ -1289,6 +1296,8 @@ end
 
 
 function PetManager.FeedPets()
+    print("🚀 FeedPets function started - NEW VERSION 2024")
+    
     if not AutomationConfig.PetManagement.AutoFeed then 
         print("🐕 Pet feeding disabled")
         return 
@@ -1388,37 +1397,55 @@ function PetManager.FeedPets()
         fruitTool = equippedTool
         print("🛠️ Fruit already equipped:", availableFruit)
     else
-        -- Try to equip fruit from inventory using InventoryService
+        -- Try to equip fruit from inventory using InventoryService first
         print("🔄 Attempting to equip fruit:", availableFruit)
         
-        local success = pcall(function()
-            -- This should create a tool and equip it
-            InventoryService:EquipItem(fruitUuid)
-        end)
+        local success = false
+        if InventoryService then
+            success = pcall(function()
+                InventoryService:EquipItem(fruitUuid)
+            end)
+        end
         
-        if success then
-            -- Wait and verify the tool is equipped
-            local maxWaitTime = 3
-            local startTime = tick()
-            local equipped = false
+        if not success then
+            print("⚠️ InventoryService:EquipItem failed, trying alternative method...")
             
-            while tick() - startTime < maxWaitTime do
-                wait(0.1)
-                local currentTool = character:FindFirstChildOfClass("Tool")
-                if currentTool and currentTool.Name == availableFruit then
-                    equipped = true
-                    fruitTool = currentTool
-                    print("✅ Fruit successfully equipped:", currentTool.Name)
+            -- Alternative: Check if fruit tool already exists in backpack
+            local toolFound = false
+            for _, item in pairs(LocalPlayer.Backpack:GetChildren()) do
+                if item:IsA("Tool") and item.Name == availableFruit then
+                    print("📦 Found fruit tool in backpack:", item.Name)
+                    humanoid:EquipTool(item)
+                    toolFound = true
                     break
                 end
             end
             
-            if not equipped then
-                print("❌ Failed to equip fruit after", maxWaitTime, "seconds")
+            if not toolFound then
+                print("❌ No fruit tool found in backpack for:", availableFruit)
+                print("⚠️ You might need to manually create/drop the fruit tool first")
                 return
             end
-        else
-            print("❌ Failed to call InventoryService:EquipItem")
+        end
+        
+        -- Wait and verify the tool is equipped
+        local maxWaitTime = 3
+        local startTime = tick()
+        local equipped = false
+        
+        while tick() - startTime < maxWaitTime do
+            wait(0.1)
+            local currentTool = character:FindFirstChildOfClass("Tool")
+            if currentTool and currentTool.Name == availableFruit then
+                equipped = true
+                fruitTool = currentTool
+                print("✅ Fruit successfully equipped:", currentTool.Name)
+                break
+            end
+        end
+        
+        if not equipped then
+            print("❌ Failed to equip fruit after", maxWaitTime, "seconds")
             return
         end
     end
