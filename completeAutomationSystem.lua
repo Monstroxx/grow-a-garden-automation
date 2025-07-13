@@ -1491,12 +1491,16 @@ function PetManager.FeedPets()
                 wait(0.5)
                 
                 local success, error = pcall(function()
-                    -- Use ActivePetService Feed remote with correct args format
-                    local formattedPetId = "{" .. petId .. "}"
-                    local args = {"Feed", formattedPetId}
-                    print("📡 Firing remote: ActivePetService with args:", args[1], args[2])
-                    print("🔧 Remote path:", "ReplicatedStorage.GameEvents.ActivePetService")
-                    ActivePetService:FireServer(unpack(args))
+                    -- Use EXACT same format as working RemoteSpy code
+                    local args = {
+                        "Feed",
+                        "{" .. petId .. "}"
+                    }
+                    print("📡 Firing remote with args:", args[1], args[2])
+                    print("🔧 Using game:GetService path (same as RemoteSpy)")
+                    
+                    -- Use exact same remote call as RemoteSpy
+                    game:GetService("ReplicatedStorage"):WaitForChild("GameEvents"):WaitForChild("ActivePetService"):FireServer(unpack(args))
                 end)
                 
                 if success then
