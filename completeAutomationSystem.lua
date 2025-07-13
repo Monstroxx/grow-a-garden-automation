@@ -1230,6 +1230,13 @@ local function GetActivePetService()
     return success and service or nil
 end
 
+local function GetInventoryService()
+    local success, service = pcall(function()
+        return ReplicatedStorage:WaitForChild("Modules", 5):WaitForChild("InventoryService", 5)
+    end)
+    return success and service or nil
+end
+
 local function GetPetEggService()
     local success, service = pcall(function()
         return ReplicatedStorage:WaitForChild("GameEvents", 5):WaitForChild("PetEggService", 5)
@@ -1289,68 +1296,8 @@ function PetManager.FeedPets()
     
     local petData = DataManager.GetPetData()
     local inventory = petData.PetInventory and petData.PetInventory.Data or {}
-    local seedsBackpack = DataManager.GetBackpack() -- Seeds only
-    local fruitsBackpack = DataManager.GetFruits() -- Fruits only
     local selectedFruits = AutomationConfig.PetManagement.SelectedFruits or {}
     local feedThreshold = tonumber(AutomationConfig.PetManagement.FeedThreshold) or 500
-    
-    -- Debug: Check what GetFruits actually returned
-    print("🔍 Checking GetFruits result:")
-    print("  fruitsBackpack type:", type(fruitsBackpack))
-    print("  fruitsBackpack has items:", next(fruitsBackpack) ~= nil)
-    if fruitsBackpack then
-        for k, v in pairs(fruitsBackpack) do
-            print("    ", k, "=", v)
-        end
-    end
-    
-    -- Fallback: If GetFruits() returns empty, search directly in inventory for any selected fruits
-    if not fruitsBackpack or next(fruitsBackpack) == nil then
-        print("⚠️ GetFruits() returned empty, searching directly for selected fruits...")
-        local data = DataManager.GetPlayerData()
-        local inventoryData = data.InventoryData or {}
-        
-        print("  Debug: Searching", #selectedFruits, "selected fruits in", #inventoryData, "inventory items")
-        
-        for uuid, itemInfo in pairs(inventoryData) do
-            if typeof(itemInfo) == "table" and itemInfo.ItemType == "Holdable" and itemInfo.ItemData then
-                local itemName = itemInfo.ItemData.ItemName
-                local quantity = itemInfo.ItemData.Quantity or 0
-                
-                print("    Found Holdable:", itemName, "qty:", quantity)
-                
-                -- Check if this holdable item matches any selected fruit (without "Seed")
-                for _, seedName in pairs(selectedFruits) do
-                    local fruitName = seedName:gsub(" Seed$", "")
-                    print("      Comparing", itemName, "with selected fruit", fruitName)
-                    
-                    if itemName == fruitName then
-                        if quantity > 0 then
-                            print("  📍 Found selected fruit directly:", itemName, "x" .. quantity)
-                            fruitsBackpack[itemName] = (fruitsBackpack[itemName] or 0) + quantity
-                        else
-                            print("  ⚠️ Found", itemName, "but quantity is 0 - checking if it's a tool...")
-                            -- Check if fruit exists as tool in backpack instead
-                            local foundTool = false
-                            for _, item in pairs(LocalPlayer.Backpack:GetChildren()) do
-                                if item:IsA("Tool") and item.Name == fruitName then
-                                    foundTool = true
-                                    print("  📍 Found", fruitName, "as tool in backpack")
-                                    fruitsBackpack[itemName] = (fruitsBackpack[itemName] or 0) + 1
-                                    break
-                                end
-                            end
-                            if not foundTool then
-                                print("  ❌ No tool found for", fruitName)
-                            end
-                        end
-                    end
-                end
-            end
-        end
-        
-        print("  After fallback search, fruitsBackpack has", next(fruitsBackpack) and "items" or "no items")
-    end
     
     print("🍎 Selected fruits:", next(selectedFruits) and "Found" or "None")
     print("Debug - selectedFruits table:")
@@ -1358,45 +1305,105 @@ function PetManager.FeedPets()
         print("  [" .. tostring(key) .. "] = " .. tostring(value))
     end
     
-    print("🌱 Available seeds in backpack:")
-    for item, amount in pairs(seedsBackpack) do
-        if amount > 0 then
-            print("  -", item, "x" .. amount)
-        end
+    -- Use proper InventoryService to find fruits
+    local InventoryService = GetInventoryService()
+    if not InventoryService then
+        print("❌ InventoryService not available")
+        return
     end
     
-    print("🍎 Available fruits in inventory:")
-    for item, amount in pairs(fruitsBackpack) do
-        if amount > 0 then
-            print("  -", item, "x" .. amount)
-        end
-    end
+    -- Find all holdable items (fruits)
+    local holdableItems = {}
+    pcall(function()
+        holdableItems = InventoryService:Find("Holdable") or {}
+    end)
     
-    -- Check if any selected fruits are available (selectedFruits is an array, not key-value)
+    print("🔍 Found", (holdableItems and #holdableItems or 0), "holdable items in inventory")
+    
+    -- Find available fruits that match selected fruits
     local availableFruit = nil
+    local fruitUuid = nil
     
-    -- selectedFruits contains seed names like "Bamboo", "Tomato", "Carrot"
-    -- We need to find the corresponding grown fruit (without "Seed")
-    for _, seedName in pairs(selectedFruits) do
-        print("🔍 Checking selected seed:", seedName)
-        
-        -- Convert seed name to fruit name (remove " Seed" if present)
-        local fruitName = seedName:gsub(" Seed$", "") -- Remove " Seed" at the end
-        
-        print("  Looking for grown fruit:", fruitName)
-        
-        -- Look for the grown fruit in fruits inventory (without "Seed")
-        if fruitsBackpack[fruitName] and fruitsBackpack[fruitName] > 0 then
-            availableFruit = fruitName
-            print("✅ Found grown fruit:", availableFruit, "(amount:", fruitsBackpack[fruitName], ")")
-            break
-        else
-            print("❌ Grown fruit not found:", fruitName)
+    for uuid, itemData in pairs(holdableItems) do
+        if itemData and itemData.ItemData and itemData.ItemData.ItemName then
+            local itemName = itemData.ItemData.ItemName
+            print("  Checking holdable:", itemName)
+            
+            -- Check if this item matches any selected fruit
+            for _, seedName in pairs(selectedFruits) do
+                local fruitName = seedName:gsub(" Seed$", "")
+                if itemName == fruitName then
+                    print("✅ Found matching fruit:", itemName, "UUID:", uuid)
+                    availableFruit = itemName
+                    fruitUuid = uuid
+                    break
+                end
+            end
+            
+            if availableFruit then break end
         end
     end
     
     if not availableFruit then
-        print("⚠️ No selected fruits available in backpack")
+        print("⚠️ No selected fruits available in inventory")
+        return
+    end
+    
+    print("🍎 Using fruit:", availableFruit, "UUID:", fruitUuid)
+    
+    -- Equip the fruit by creating a tool from the inventory item
+    local character = LocalPlayer.Character
+    local humanoid = character and character:FindFirstChild("Humanoid")
+    if not humanoid then 
+        print("❌ Character or humanoid not found")
+        return 
+    end
+    
+    -- Check if fruit tool is already equipped
+    local fruitTool = nil
+    local equippedTool = character:FindFirstChildOfClass("Tool")
+    if equippedTool and equippedTool.Name == availableFruit then
+        fruitTool = equippedTool
+        print("🛠️ Fruit already equipped:", availableFruit)
+    else
+        -- Try to equip fruit from inventory using InventoryService
+        print("🔄 Attempting to equip fruit:", availableFruit)
+        
+        local success = pcall(function()
+            -- This should create a tool and equip it
+            InventoryService:EquipItem(fruitUuid)
+        end)
+        
+        if success then
+            -- Wait and verify the tool is equipped
+            local maxWaitTime = 3
+            local startTime = tick()
+            local equipped = false
+            
+            while tick() - startTime < maxWaitTime do
+                wait(0.1)
+                local currentTool = character:FindFirstChildOfClass("Tool")
+                if currentTool and currentTool.Name == availableFruit then
+                    equipped = true
+                    fruitTool = currentTool
+                    print("✅ Fruit successfully equipped:", currentTool.Name)
+                    break
+                end
+            end
+            
+            if not equipped then
+                print("❌ Failed to equip fruit after", maxWaitTime, "seconds")
+                return
+            end
+        else
+            print("❌ Failed to call InventoryService:EquipItem")
+            return
+        end
+    end
+    
+    -- Verify we have an equipped fruit tool
+    if not fruitTool or fruitTool.Parent ~= character then
+        print("❌ Fruit tool not properly equipped")
         return
     end
     
