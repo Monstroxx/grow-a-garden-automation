@@ -1314,6 +1314,29 @@ function PetManager.FeedPets()
         end
     end
     
+    -- Fallback: If GetFruits() returns empty, search directly in inventory for any selected fruits
+    if next(fruitsBackpack) == nil then
+        print("⚠️ GetFruits() returned empty, searching directly for selected fruits...")
+        local data = DataManager.GetPlayerData()
+        local inventoryData = data.InventoryData or {}
+        
+        for uuid, itemInfo in pairs(inventoryData) do
+            if typeof(itemInfo) == "table" and itemInfo.ItemType == "Holdable" and itemInfo.ItemData then
+                local itemName = itemInfo.ItemData.ItemName
+                local quantity = itemInfo.ItemData.Quantity or 0
+                
+                -- Check if this holdable item matches any selected fruit (without "Seed")
+                for _, seedName in pairs(selectedFruits) do
+                    local fruitName = seedName:gsub(" Seed$", "")
+                    if itemName == fruitName and quantity > 0 then
+                        print("  📍 Found selected fruit directly:", itemName, "x" .. quantity)
+                        fruitsBackpack[itemName] = (fruitsBackpack[itemName] or 0) + quantity
+                    end
+                end
+            end
+        end
+    end
+    
     -- Check if any selected fruits are available (selectedFruits is an array, not key-value)
     local availableFruit = nil
     
