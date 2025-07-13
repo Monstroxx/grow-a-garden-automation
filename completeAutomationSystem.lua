@@ -1396,9 +1396,9 @@ function PetManager.FeedPets()
     
     if equippedTool then
         local itemType = equippedTool:GetAttribute("ITEM_TYPE") or equippedTool:GetAttribute("b")
-        if itemType == "j" and equippedTool.Name == availableFruit then
+        if itemType == "j" and equippedTool.Name:find(availableFruit) then
             fruitTool = equippedTool
-            print("🛠️ Fruit already equipped:", availableFruit)
+            print("🛠️ Fruit already equipped:", equippedTool.Name)
         end
     end
     
@@ -1412,7 +1412,8 @@ function PetManager.FeedPets()
                 print("  Found tool:", tool.Name, "type:", itemType)
                 
                 -- Check for holdable fruits (ITEM_TYPE = "j")
-                if itemType == "j" and tool.Name == availableFruit then
+                -- Tool names include weight and mutations, so check if they contain the fruit name
+                if itemType == "j" and tool.Name:find(availableFruit) then
                     fruitTool = tool
                     print("✅ Found fruit tool in backpack:", tool.Name)
                     break
