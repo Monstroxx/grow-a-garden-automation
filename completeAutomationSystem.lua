@@ -1308,48 +1308,24 @@ function PetManager.FeedPets()
     local selectedFruits = AutomationConfig.PetManagement.SelectedFruits or {}
     local feedThreshold = tonumber(AutomationConfig.PetManagement.FeedThreshold) or 500
     
-    print("🍎 Selected fruits:", next(selectedFruits) and "Found" or "None")
-    print("Debug - selectedFruits table:")
-    for key, value in pairs(selectedFruits) do
-        print("  [" .. tostring(key) .. "] = " .. tostring(value))
-    end
+    print("🍎 Selected fruits:", #selectedFruits, "items")
     
     -- Try to use InventoryService first, fallback to direct data access
     local InventoryService = GetInventoryService()
     local holdableItems = {}
     
-    if InventoryService then
-        print("✅ InventoryService available, trying Find method...")
-        local success = pcall(function()
-            holdableItems = InventoryService:Find("Holdable") or {}
-        end)
-        
-        if not success then
-            print("❌ InventoryService:Find failed, using fallback...")
-            InventoryService = nil
-        else
-            print("🔍 InventoryService found", (holdableItems and #holdableItems or 0), "holdable items")
+    -- Use direct inventory data access (simplified)
+    local data = DataManager.GetPlayerData()
+    local inventoryData = data.InventoryData or {}
+    
+    holdableItems = {}
+    for uuid, itemInfo in pairs(inventoryData) do
+        if typeof(itemInfo) == "table" and itemInfo.ItemType == "Holdable" and itemInfo.ItemData then
+            holdableItems[uuid] = itemInfo
         end
-    else
-        print("❌ InventoryService not available, using direct data access...")
     end
     
-    -- Fallback: Direct inventory data access
-    if not InventoryService or not holdableItems or next(holdableItems) == nil then
-        print("🔄 Using fallback: Direct inventory data access...")
-        local data = DataManager.GetPlayerData()
-        local inventoryData = data.InventoryData or {}
-        
-        holdableItems = {}
-        for uuid, itemInfo in pairs(inventoryData) do
-            if typeof(itemInfo) == "table" and itemInfo.ItemType == "Holdable" and itemInfo.ItemData then
-                holdableItems[uuid] = itemInfo
-                print("  Found holdable item:", itemInfo.ItemData.ItemName or "Unknown")
-            end
-        end
-        
-        print("🔍 Fallback found", (holdableItems and #holdableItems or 0), "holdable items in inventory")
-    end
+    print("🔍 Found", #holdableItems, "holdable items")
     
     -- Find available fruits that match selected fruits
     local availableFruit = nil
@@ -1358,13 +1334,11 @@ function PetManager.FeedPets()
     for uuid, itemData in pairs(holdableItems) do
         if itemData and itemData.ItemData and itemData.ItemData.ItemName then
             local itemName = itemData.ItemData.ItemName
-            print("  Checking holdable:", itemName)
             
             -- Check if this item matches any selected fruit
             for _, seedName in pairs(selectedFruits) do
                 local fruitName = seedName:gsub(" Seed$", "")
                 if itemName == fruitName then
-                    print("✅ Found matching fruit:", itemName, "UUID:", uuid)
                     availableFruit = itemName
                     fruitUuid = uuid
                     break
@@ -1409,11 +1383,6 @@ function PetManager.FeedPets()
         for _, tool in pairs(LocalPlayer.Backpack:GetChildren()) do
             if tool:IsA("Tool") then
                 local itemType = tool:GetAttribute("ITEM_TYPE") or tool:GetAttribute("b")
-                print("  Found tool:", tool.Name, "type:", itemType)
-                
-                -- Check for holdable fruits (ITEM_TYPE = "j")
-                -- Tool names include weight and mutations, so check if they contain the fruit name
-                print("    Checking:", tool.Name, "itemType:", itemType, "contains", availableFruit, "?", tool.Name:find(availableFruit) ~= nil)
                 
                 if itemType == "j" and tool.Name:find(availableFruit) then
                     fruitTool = tool
@@ -1486,8 +1455,11 @@ function PetManager.FeedPets()
         print("🐶 Checking pet in slot", slot, "ID:", petId)
         
         if pet then
-            print("  Pet hunger:", pet.Hunger, "/ threshold:", feedThreshold)
-            if pet.Hunger and pet.Hunger < feedThreshold then
+            -- Correct pet data structure: pet.PetData.Hunger
+            local petData = pet.PetData
+            local hunger = petData and petData.Hunger or nil
+            print("  Pet hunger:", hunger, "/ threshold:", feedThreshold)
+            if hunger and hunger < feedThreshold then
                 print("🍎 Feeding pet", petId, "with", availableFruit)
                 
                 local success, error = pcall(function()
