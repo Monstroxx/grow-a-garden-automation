@@ -1477,14 +1477,25 @@ function PetManager.FeedPets()
             if hunger and hunger < feedThreshold then
                 print("🍎 Feeding pet", petId, "with", availableFruit)
                 
+                -- Debug: Check tool status and character position before feeding
+                local currentTool = character:FindFirstChildOfClass("Tool")
+                print("🔍 Pre-feed check:")
+                print("  Tool equipped:", currentTool and currentTool.Name or "none")
+                print("  Tool has FruitTool tag:", currentTool and currentTool:HasTag("FruitTool") or "no tool")
+                print("  Character position:", character.PrimaryPart and character.PrimaryPart.Position or "no position")
+                
                 -- Store hunger before feeding
                 local hungerBefore = hunger
+                
+                -- Add extra wait to ensure tool is fully ready
+                wait(0.5)
                 
                 local success, error = pcall(function()
                     -- Use ActivePetService Feed remote with correct args format
                     local formattedPetId = "{" .. petId .. "}"
                     local args = {"Feed", formattedPetId}
                     print("📡 Firing remote: ActivePetService with args:", args[1], args[2])
+                    print("🔧 Remote path:", "ReplicatedStorage.GameEvents.ActivePetService")
                     ActivePetService:FireServer(unpack(args))
                 end)
                 
