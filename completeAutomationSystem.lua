@@ -1413,24 +1413,39 @@ function PetManager.FeedPets()
                 print("❌ Failed to equip fruit tool:", availableFruit)
                 return
             end
+            
+            -- Add FruitTool tag if missing (required for server validation)
+            if fruitTool and not fruitTool:HasTag("FruitTool") then
+                print("🏷️ Adding required FruitTool tag")
+                fruitTool:AddTag("FruitTool")
+            end
         else
             print("❌ Fruit tool not found in backpack:", availableFruit)
             print("💡 Available tools in backpack:")
             for _, tool in pairs(LocalPlayer.Backpack:GetChildren()) do
                 if tool:IsA("Tool") then
                     local itemType = tool:GetAttribute("ITEM_TYPE") or tool:GetAttribute("b")
-                    print("  -", tool.Name, "(type:", itemType, ")")
+                    local hasFruitTag = tool:HasTag("FruitTool")
+                    print("  -", tool.Name, "(type:", itemType, ", FruitTool:", hasFruitTag, ")")
                 end
             end
             return
         end
     end
     
-    -- Verify we have an equipped fruit tool
+    -- Verify we have an equipped fruit tool with proper tag
     if not fruitTool or fruitTool.Parent ~= character then
         print("❌ Fruit tool not properly equipped")
         return
     end
+    
+    -- Final check: Ensure FruitTool tag is present
+    if not fruitTool:HasTag("FruitTool") then
+        print("🏷️ Adding required FruitTool tag to equipped tool")
+        fruitTool:AddTag("FruitTool")
+    end
+    
+    print("✅ Fruit tool equipped with FruitTool tag:", fruitTool:HasTag("FruitTool"))
     
     local ActivePetService = GetActivePetService()
     if not ActivePetService then
