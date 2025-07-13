@@ -1305,20 +1305,42 @@ function PetManager.FeedPets()
         print("  [" .. tostring(key) .. "] = " .. tostring(value))
     end
     
-    -- Use proper InventoryService to find fruits
+    -- Try to use InventoryService first, fallback to direct data access
     local InventoryService = GetInventoryService()
-    if not InventoryService then
-        print("❌ InventoryService not available")
-        return
+    local holdableItems = {}
+    
+    if InventoryService then
+        print("✅ InventoryService available, trying Find method...")
+        local success = pcall(function()
+            holdableItems = InventoryService:Find("Holdable") or {}
+        end)
+        
+        if not success then
+            print("❌ InventoryService:Find failed, using fallback...")
+            InventoryService = nil
+        else
+            print("🔍 InventoryService found", (holdableItems and #holdableItems or 0), "holdable items")
+        end
+    else
+        print("❌ InventoryService not available, using direct data access...")
     end
     
-    -- Find all holdable items (fruits)
-    local holdableItems = {}
-    pcall(function()
-        holdableItems = InventoryService:Find("Holdable") or {}
-    end)
-    
-    print("🔍 Found", (holdableItems and #holdableItems or 0), "holdable items in inventory")
+    -- Fallback: Direct inventory data access
+    if not InventoryService or not holdableItems or next(holdableItems) == nil then
+        print("🔄 Using fallback: Direct inventory data access...")
+        local data = DataManager.GetPlayerData()
+        local inventoryData = data.InventoryData or {}
+        
+        holdableItems = {}
+        for uuid, itemInfo in pairs(inventoryData) do
+            if typeof(itemInfo) == "table" and itemInfo.ItemType == "Holdable" and itemInfo.ItemData then
+                holdableItems[uuid] = itemInfo
+                print("  Found holdable item:", itemInfo.ItemData.ItemName or "Unknown")
+            end
+        end
+        
+        print("🔍 Fallback found", (holdableItems and #holdableItems or 0), "holdable items in inventory")
+    end
     
     -- Find available fruits that match selected fruits
     local availableFruit = nil
