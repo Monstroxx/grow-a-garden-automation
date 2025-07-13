@@ -1511,9 +1511,43 @@ function PetManager.FeedPets()
                 end
                 
                 local success, error = pcall(function()
-                    local args = {"Feed", "{" .. petId .. "}"}
-                    print("📡 Firing remote with args:", args[1], args[2])
-                    ActivePetService:FireServer(unpack(args))
+                    print("🔍 Looking for pet ProximityPrompt instead of direct remote...")
+                    
+                    -- Find the pet model in workspace to trigger its proximity prompt
+                    local workspace = game:GetService("Workspace")
+                    local foundPrompt = false
+                    
+                    -- Look for pet models with proximity prompts
+                    for _, obj in pairs(workspace:GetDescendants()) do
+                        if obj:IsA("ProximityPrompt") and obj.ActionText == "Feed" then
+                            local petModel = obj.Parent
+                            if petModel and petModel:GetAttribute("PET_UUID") == petId then
+                                print("✅ Found pet's Feed ProximityPrompt:", petModel.Name)
+                                
+                                -- Check distance (should be within 5 studs)
+                                if petModel.PrimaryPart and character.PrimaryPart then
+                                    local distance = (petModel.PrimaryPart.Position - character.PrimaryPart.Position).Magnitude
+                                    print("📏 Distance to pet:", distance, "studs")
+                                    
+                                    if distance <= 7 then -- Give some leeway
+                                        print("📡 Triggering ProximityPrompt (proper method)")
+                                        fireproximityprompt(obj)
+                                        foundPrompt = true
+                                        break
+                                    else
+                                        print("⚠️ Too far from pet:", distance, "studs (max 5)")
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    
+                    if not foundPrompt then
+                        print("❌ No Feed ProximityPrompt found for pet", petId)
+                        print("🔄 Falling back to direct remote...")
+                        local args = {"Feed", "{" .. petId .. "}"}
+                        ActivePetService:FireServer(unpack(args))
+                    end
                 end)
                 
                 if success then
