@@ -1390,62 +1390,66 @@ function PetManager.FeedPets()
         return 
     end
     
-    -- Check if fruit tool is already equipped
+    -- Check if fruit tool is already equipped (same pattern as seeds)
     local fruitTool = nil
     local equippedTool = character:FindFirstChildOfClass("Tool")
-    if equippedTool and equippedTool.Name == availableFruit then
-        fruitTool = equippedTool
-        print("🛠️ Fruit already equipped:", availableFruit)
-    else
-        -- Try to equip fruit from inventory using InventoryService first
-        print("🔄 Attempting to equip fruit:", availableFruit)
-        
-        local success = false
-        if InventoryService then
-            success = pcall(function()
-                InventoryService:EquipItem(fruitUuid)
-            end)
+    
+    if equippedTool then
+        local itemType = equippedTool:GetAttribute("ITEM_TYPE") or equippedTool:GetAttribute("b")
+        if itemType == "j" and equippedTool.Name == availableFruit then
+            fruitTool = equippedTool
+            print("🛠️ Fruit already equipped:", availableFruit)
         end
+    end
+    
+    -- If not equipped, find and equip fruit tool from backpack (same pattern as seeds)
+    if not fruitTool then
+        print("🔍 Looking for fruit tool in backpack:", availableFruit)
         
-        if not success then
-            print("⚠️ InventoryService:EquipItem failed, trying alternative method...")
-            
-            -- Alternative: Check if fruit tool already exists in backpack
-            local toolFound = false
-            for _, item in pairs(LocalPlayer.Backpack:GetChildren()) do
-                if item:IsA("Tool") and item.Name == availableFruit then
-                    print("📦 Found fruit tool in backpack:", item.Name)
-                    humanoid:EquipTool(item)
-                    toolFound = true
+        for _, tool in pairs(LocalPlayer.Backpack:GetChildren()) do
+            if tool:IsA("Tool") then
+                local itemType = tool:GetAttribute("ITEM_TYPE") or tool:GetAttribute("b")
+                print("  Found tool:", tool.Name, "type:", itemType)
+                
+                -- Check for holdable fruits (ITEM_TYPE = "j")
+                if itemType == "j" and tool.Name == availableFruit then
+                    fruitTool = tool
+                    print("✅ Found fruit tool in backpack:", tool.Name)
                     break
                 end
             end
+        end
+        
+        if fruitTool then
+            -- Equip the fruit tool (same as seeds)
+            print("🔄 Equipping fruit tool:", fruitTool.Name)
+            humanoid:EquipTool(fruitTool)
             
-            if not toolFound then
-                print("❌ No fruit tool found in backpack for:", availableFruit)
-                print("⚠️ You might need to manually create/drop the fruit tool first")
+            -- Wait for tool to be equipped (same as seeds)
+            local equipped = false
+            for i = 1, 20 do -- Wait up to 2 seconds
+                local newEquippedTool = character:FindFirstChildOfClass("Tool")
+                if newEquippedTool and newEquippedTool == fruitTool then
+                    equipped = true
+                    print("✅ Fruit successfully equipped:", fruitTool.Name)
+                    break
+                end
+                wait(0.1)
+            end
+            
+            if not equipped then
+                print("❌ Failed to equip fruit tool:", availableFruit)
                 return
             end
-        end
-        
-        -- Wait and verify the tool is equipped
-        local maxWaitTime = 3
-        local startTime = tick()
-        local equipped = false
-        
-        while tick() - startTime < maxWaitTime do
-            wait(0.1)
-            local currentTool = character:FindFirstChildOfClass("Tool")
-            if currentTool and currentTool.Name == availableFruit then
-                equipped = true
-                fruitTool = currentTool
-                print("✅ Fruit successfully equipped:", currentTool.Name)
-                break
+        else
+            print("❌ Fruit tool not found in backpack:", availableFruit)
+            print("💡 Available tools in backpack:")
+            for _, tool in pairs(LocalPlayer.Backpack:GetChildren()) do
+                if tool:IsA("Tool") then
+                    local itemType = tool:GetAttribute("ITEM_TYPE") or tool:GetAttribute("b")
+                    print("  -", tool.Name, "(type:", itemType, ")")
+                end
             end
-        end
-        
-        if not equipped then
-            print("❌ Failed to equip fruit after", maxWaitTime, "seconds")
             return
         end
     end
