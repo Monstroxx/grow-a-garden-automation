@@ -1300,14 +1300,20 @@ function PetManager.FeedPets()
         local data = DataManager.GetPlayerData()
         local inventoryData = data.InventoryData or {}
         
+        print("  Debug: Searching", #selectedFruits, "selected fruits in", #inventoryData, "inventory items")
+        
         for uuid, itemInfo in pairs(inventoryData) do
             if typeof(itemInfo) == "table" and itemInfo.ItemType == "Holdable" and itemInfo.ItemData then
                 local itemName = itemInfo.ItemData.ItemName
                 local quantity = itemInfo.ItemData.Quantity or 0
                 
+                print("    Found Holdable:", itemName, "qty:", quantity)
+                
                 -- Check if this holdable item matches any selected fruit (without "Seed")
                 for _, seedName in pairs(selectedFruits) do
                     local fruitName = seedName:gsub(" Seed$", "")
+                    print("      Comparing", itemName, "with selected fruit", fruitName)
+                    
                     if itemName == fruitName and quantity > 0 then
                         print("  📍 Found selected fruit directly:", itemName, "x" .. quantity)
                         fruitsBackpack[itemName] = (fruitsBackpack[itemName] or 0) + quantity
@@ -1315,6 +1321,8 @@ function PetManager.FeedPets()
                 end
             end
         end
+        
+        print("  After fallback search, fruitsBackpack has", next(fruitsBackpack) and "items" or "no items")
     end
     
     print("🍎 Selected fruits:", next(selectedFruits) and "Found" or "None")
