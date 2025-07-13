@@ -1294,8 +1294,18 @@ function PetManager.FeedPets()
     local selectedFruits = AutomationConfig.PetManagement.SelectedFruits or {}
     local feedThreshold = tonumber(AutomationConfig.PetManagement.FeedThreshold) or 500
     
+    -- Debug: Check what GetFruits actually returned
+    print("🔍 Checking GetFruits result:")
+    print("  fruitsBackpack type:", type(fruitsBackpack))
+    print("  fruitsBackpack has items:", next(fruitsBackpack) ~= nil)
+    if fruitsBackpack then
+        for k, v in pairs(fruitsBackpack) do
+            print("    ", k, "=", v)
+        end
+    end
+    
     -- Fallback: If GetFruits() returns empty, search directly in inventory for any selected fruits
-    if next(fruitsBackpack) == nil then
+    if not fruitsBackpack or next(fruitsBackpack) == nil then
         print("⚠️ GetFruits() returned empty, searching directly for selected fruits...")
         local data = DataManager.GetPlayerData()
         local inventoryData = data.InventoryData or {}
