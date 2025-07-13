@@ -1487,20 +1487,33 @@ function PetManager.FeedPets()
                 -- Store hunger before feeding
                 local hungerBefore = hunger
                 
-                -- Add extra wait to ensure tool is fully ready
-                wait(0.5)
+                -- Try to "activate" the tool like a player would
+                local tool = character:FindFirstChildOfClass("Tool")
+                if tool and tool.Parent == character then
+                    print("🔧 Activating tool...")
+                    
+                    -- Simulate tool activation (like clicking)
+                    if tool:FindFirstChild("Activated") then
+                        tool:Activate()
+                    end
+                    
+                    -- Wait longer for tool to be properly "ready"
+                    wait(2)
+                    
+                    -- Double-check tool is still equipped
+                    local stillEquipped = character:FindFirstChildOfClass("Tool")
+                    if not stillEquipped or stillEquipped.Name ~= tool.Name then
+                        print("⚠️ Tool was unequipped during wait")
+                        return
+                    end
+                    
+                    print("✅ Tool confirmed ready after activation wait")
+                end
                 
                 local success, error = pcall(function()
-                    -- Use EXACT same format as working RemoteSpy code
-                    local args = {
-                        "Feed",
-                        "{" .. petId .. "}"
-                    }
+                    local args = {"Feed", "{" .. petId .. "}"}
                     print("📡 Firing remote with args:", args[1], args[2])
-                    print("🔧 Using game:GetService path (same as RemoteSpy)")
-                    
-                    -- Use exact same remote call as RemoteSpy
-                    game:GetService("ReplicatedStorage"):WaitForChild("GameEvents"):WaitForChild("ActivePetService"):FireServer(unpack(args))
+                    ActivePetService:FireServer(unpack(args))
                 end)
                 
                 if success then
