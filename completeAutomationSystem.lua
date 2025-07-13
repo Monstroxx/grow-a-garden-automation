@@ -1462,6 +1462,9 @@ function PetManager.FeedPets()
             if hunger and hunger < feedThreshold then
                 print("🍎 Feeding pet", petId, "with", availableFruit)
                 
+                -- Store hunger before feeding
+                local hungerBefore = hunger
+                
                 local success, error = pcall(function()
                     -- Use ActivePetService Feed remote with correct args format
                     local formattedPetId = "{" .. petId .. "}"
@@ -1471,16 +1474,35 @@ function PetManager.FeedPets()
                 end)
                 
                 if success then
-                    print("✅ Successfully fed pet", petId)
-                    webhook:Log("INFO", "Fed equipped pet", {
-                        PetId = petId,
-                        Slot = slot,
-                        Food = availableFruit,
-                        Hunger = pet.Hunger
-                    })
+                    print("📡 Remote fired successfully")
+                    
+                    -- Wait and check if hunger actually increased
+                    wait(1)
+                    local updatedPet = DataManager.GetPetData().PetInventory.Data[petId]
+                    local updatedHunger = updatedPet and updatedPet.PetData and updatedPet.PetData.Hunger or hungerBefore
+                    
+                    if updatedHunger > hungerBefore then
+                        print("✅ Pet actually fed! Hunger:", hungerBefore, "→", updatedHunger)
+                        webhook:Log("INFO", "Fed equipped pet", {
+                            PetId = petId,
+                            Slot = slot,
+                            Food = availableFruit,
+                            HungerBefore = hungerBefore,
+                            HungerAfter = updatedHunger
+                        })
+                    else
+                        print("⚠️ Remote fired but hunger didn't increase. Hunger still:", updatedHunger)
+                        webhook:Log("WARN", "Feed remote fired but no hunger change", {
+                            PetId = petId,
+                            Slot = slot,
+                            Food = availableFruit,
+                            Hunger = hungerBefore
+                        })
+                    end
+                    
                     wait(0.5) -- Small delay between pets
                 else
-                    print("❌ Failed to feed pet:", error)
+                    print("❌ Failed to fire remote:", error)
                     webhook:Log("ERROR", "Failed to feed equipped pet", {
                         PetId = petId,
                         Slot = slot,
