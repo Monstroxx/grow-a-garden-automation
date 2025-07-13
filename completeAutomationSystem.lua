@@ -1294,26 +1294,6 @@ function PetManager.FeedPets()
     local selectedFruits = AutomationConfig.PetManagement.SelectedFruits or {}
     local feedThreshold = tonumber(AutomationConfig.PetManagement.FeedThreshold) or 500
     
-    print("🍎 Selected fruits:", next(selectedFruits) and "Found" or "None")
-    print("Debug - selectedFruits table:")
-    for key, value in pairs(selectedFruits) do
-        print("  [" .. tostring(key) .. "] = " .. tostring(value))
-    end
-    
-    print("🌱 Available seeds in backpack:")
-    for item, amount in pairs(seedsBackpack) do
-        if amount > 0 then
-            print("  -", item, "x" .. amount)
-        end
-    end
-    
-    print("🍎 Available fruits in inventory:")
-    for item, amount in pairs(fruitsBackpack) do
-        if amount > 0 then
-            print("  -", item, "x" .. amount)
-        end
-    end
-    
     -- Fallback: If GetFruits() returns empty, search directly in inventory for any selected fruits
     if next(fruitsBackpack) == nil then
         print("⚠️ GetFruits() returned empty, searching directly for selected fruits...")
@@ -1334,6 +1314,26 @@ function PetManager.FeedPets()
                     end
                 end
             end
+        end
+    end
+    
+    print("🍎 Selected fruits:", next(selectedFruits) and "Found" or "None")
+    print("Debug - selectedFruits table:")
+    for key, value in pairs(selectedFruits) do
+        print("  [" .. tostring(key) .. "] = " .. tostring(value))
+    end
+    
+    print("🌱 Available seeds in backpack:")
+    for item, amount in pairs(seedsBackpack) do
+        if amount > 0 then
+            print("  -", item, "x" .. amount)
+        end
+    end
+    
+    print("🍎 Available fruits in inventory:")
+    for item, amount in pairs(fruitsBackpack) do
+        if amount > 0 then
+            print("  -", item, "x" .. amount)
         end
     end
     
