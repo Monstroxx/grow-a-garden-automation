@@ -1324,9 +1324,26 @@ function PetManager.FeedPets()
                     local fruitName = seedName:gsub(" Seed$", "")
                     print("      Comparing", itemName, "with selected fruit", fruitName)
                     
-                    if itemName == fruitName and quantity > 0 then
-                        print("  📍 Found selected fruit directly:", itemName, "x" .. quantity)
-                        fruitsBackpack[itemName] = (fruitsBackpack[itemName] or 0) + quantity
+                    if itemName == fruitName then
+                        if quantity > 0 then
+                            print("  📍 Found selected fruit directly:", itemName, "x" .. quantity)
+                            fruitsBackpack[itemName] = (fruitsBackpack[itemName] or 0) + quantity
+                        else
+                            print("  ⚠️ Found", itemName, "but quantity is 0 - checking if it's a tool...")
+                            -- Check if fruit exists as tool in backpack instead
+                            local foundTool = false
+                            for _, item in pairs(LocalPlayer.Backpack:GetChildren()) do
+                                if item:IsA("Tool") and item.Name == fruitName then
+                                    foundTool = true
+                                    print("  📍 Found", fruitName, "as tool in backpack")
+                                    fruitsBackpack[itemName] = (fruitsBackpack[itemName] or 0) + 1
+                                    break
+                                end
+                            end
+                            if not foundTool then
+                                print("  ❌ No tool found for", fruitName)
+                            end
+                        end
                     end
                 end
             end
