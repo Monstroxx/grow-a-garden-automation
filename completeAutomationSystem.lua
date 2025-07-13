@@ -1517,25 +1517,33 @@ function PetManager.FeedPets()
                     local workspace = game:GetService("Workspace")
                     local foundPrompt = false
                     
-                    -- Look for pet models with proximity prompts
+                    -- Look for ProximityPrompts with ActionText starting with "Feed%"
                     for _, obj in pairs(workspace:GetDescendants()) do
-                        if obj:IsA("ProximityPrompt") and obj.ActionText == "Feed" then
-                            local petModel = obj.Parent
-                            if petModel and petModel:GetAttribute("PET_UUID") == petId then
-                                print("✅ Found pet's Feed ProximityPrompt:", petModel.Name)
+                        if obj:IsA("ProximityPrompt") then
+                            local parent = obj.Parent
+                            local actionText = obj.ActionText or ""
+                            
+                            -- Check if this is a Feed prompt (starts with "Feed%")
+                            if actionText:find("^Feed%%") and parent then
+                                -- Check if this pet belongs to us by UUID attribute
+                                local petUUID = parent:GetAttribute("PET_UUID")
                                 
-                                -- Check distance (should be within 5 studs)
-                                if petModel.PrimaryPart and character.PrimaryPart then
-                                    local distance = (petModel.PrimaryPart.Position - character.PrimaryPart.Position).Magnitude
-                                    print("📏 Distance to pet:", distance, "studs")
+                                if petUUID == petId then
+                                    print("✅ Found pet's Feed ProximityPrompt:", parent.Name, "ActionText:", actionText)
                                     
-                                    if distance <= 7 then -- Give some leeway
-                                        print("📡 Triggering ProximityPrompt (proper method)")
-                                        fireproximityprompt(obj)
-                                        foundPrompt = true
-                                        break
-                                    else
-                                        print("⚠️ Too far from pet:", distance, "studs (max 5)")
+                                    -- Check distance
+                                    if parent.PrimaryPart and character.PrimaryPart then
+                                        local distance = (parent.PrimaryPart.Position - character.PrimaryPart.Position).Magnitude
+                                        print("📏 Distance to pet:", distance, "studs")
+                                        
+                                        if distance <= 7 then
+                                            print("📡 Triggering Feed ProximityPrompt")
+                                            fireproximityprompt(obj)
+                                            foundPrompt = true
+                                            break
+                                        else
+                                            print("⚠️ Too far from pet:", distance, "studs")
+                                        end
                                     end
                                 end
                             end
