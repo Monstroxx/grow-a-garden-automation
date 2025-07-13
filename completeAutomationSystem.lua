@@ -1367,7 +1367,27 @@ function PetManager.FeedPets()
             -- Equip the fruit (similar to auto plant function)
             print("🛠️ Equipping fruit:", fruitTool.Name)
             humanoid:EquipTool(fruitTool)
-            wait(0.5)
+            
+            -- Wait longer and verify the tool is equipped
+            local maxWaitTime = 3
+            local startTime = tick()
+            local equipped = false
+            
+            while tick() - startTime < maxWaitTime do
+                wait(0.1)
+                local currentTool = character:FindFirstChildOfClass("Tool")
+                if currentTool and currentTool.Name == availableFruit then
+                    equipped = true
+                    fruitTool = currentTool -- Update reference to equipped tool
+                    print("✅ Fruit successfully equipped:", currentTool.Name)
+                    break
+                end
+            end
+            
+            if not equipped then
+                print("❌ Failed to equip fruit after", maxWaitTime, "seconds")
+                return
+            end
         else
             print("❌ Fruit tool not found in backpack:", availableFruit)
             print("Available tools:")
@@ -1376,10 +1396,13 @@ function PetManager.FeedPets()
                     print("  -", item.Name)
                 end
             end
+            return
         end
     end
     
-    if not fruitTool then
+    -- Verify we have an equipped fruit tool
+    if not fruitTool or fruitTool.Parent ~= character then
+        print("❌ Fruit tool not properly equipped")
         return
     end
     
@@ -1411,10 +1434,11 @@ function PetManager.FeedPets()
                 print("🍎 Feeding pet", petId, "with", availableFruit)
                 
                 local success, error = pcall(function()
-                    -- Use ActivePetService Feed remote with pet UUID in curly braces format
+                    -- Use ActivePetService Feed remote with correct args format
                     local formattedPetId = "{" .. petId .. "}"
-                    print("📡 Firing remote: ActivePetService('Feed',", formattedPetId, ")")
-                    ActivePetService:FireServer("Feed", formattedPetId)
+                    local args = {"Feed", formattedPetId}
+                    print("📡 Firing remote: ActivePetService with args:", args[1], args[2])
+                    ActivePetService:FireServer(unpack(args))
                 end)
                 
                 if success then
